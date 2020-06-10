@@ -17,25 +17,25 @@ class ParserUni implements FeedParserInterface
 {
 
     //Пути к файлам фида
-    private $ar_files_paths = array();
+    private $arFilesPaths = array();
 
-    private $feed_ID;
+    private $feedId;
 
-    private $manufacturer_ID;
+    private $manufacturerId;
 
     private $logger;
 
     private $errors = [];
 
-    private $test_mode = false;
+    private $testMode = false;
 
-    private $temp_folder;
+    private $tempFolder;
 
     public function __construct()
     {
         echo 'Parser is created!' . "\n";
         $this->logger = new TableLogger(new FeedsImporterDebugLogTable());
-        $this->temp_folder = $_SERVER['DOCUMENT_ROOT'] . '/upload/feeds_temp/';
+        $this->tempFolder = $_SERVER['DOCUMENT_ROOT'] . '/upload/feeds_temp/';
     }
 
     /**
@@ -51,48 +51,48 @@ class ParserUni implements FeedParserInterface
         echo 'start parsing, feedId = ' . $feedId . "\n";
         \Bitrix\Main\Diag\Debug::startTimeLabel('import_' . $manufacturerId);
 
-        $this->feed_ID = $feedId;
-        $this->manufacturer_ID = $manufacturerId;
-        $this->test_mode = $testMode;
+        $this->feedId = $feedId;
+        $this->manufacturerId = $manufacturerId;
+        $this->testMode = $testMode;
 
         // Получаем массив путей к файлам/файлу
-        $this->handle_feed_load_type();
+        $this->handleFeedLoadType();
 
-        if (empty($this->ar_files_paths)) {
+        if (empty($this->arFilesPaths)) {
             $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Не найдены файлы фида'];
-            $this->logger->addToLog('parse feed', 'error', ['msg' => 'Пустой массив путей к файлам фида', 'feed_id' => $this->feed_ID]);
+            $this->logger->addToLog('parse feed', 'error', ['msg' => 'Пустой массив путей к файлам фида', 'feed_id' => $this->feedId]);
             return;
         }
 
-        foreach ($this->ar_files_paths as $file_path => $file_type) {
-            $this->parse_file($file_path, $file_type);
+        foreach ($this->arFilesPaths as $filePath => $fileType) {
+            $this->parse_file($filePath, $fileType);
         }
 
-        \Bitrix\Main\Diag\Debug::endTimeLabel('import_' . $this->manufacturer_ID);
-        $ar_labels = \Bitrix\Main\Diag\Debug::getTimeLabels();
-        print_r('Времени потрачено: ' . $ar_labels['import_' . $this->manufacturer_ID]['time'] . " сек \n");
+        \Bitrix\Main\Diag\Debug::endTimeLabel('import_' . $this->manufacturerId);
+        $arLabels = \Bitrix\Main\Diag\Debug::getTimeLabels();
+        print_r('Времени потрачено: ' . $arLabels['import_' . $this->manufacturerId]['time'] . " сек \n");
     }
 
     /**
      * Парсим файл фида
-     * @param string $file_path Путь к файлу фида
-     * @param string $file_type Тип файла @var Xml @var Xlsx
+     * @param string $filePath Путь к файлу фида
+     * @param string $fileType Тип файла @var Xml @var Xlsx
      */
-    private function parse_file($file_path, $file_type)
+    private function parse_file($filePath, $fileType)
     {
 
         /**
          * Если xlsx - используется excel_parse
          * Если xml - используется xml_parse
          */
-        switch ($file_type) {
+        switch ($fileType) {
 
             case 'Xlsx':
                 $obj = new ExcelParse();
-                $obj->run($this->manufacturer_ID, $this->feed_ID, $file_path, $this->test_mode);
-                $parse_errors = $obj->getErrors();
-                if (!empty($parse_errors)) {
-                    $this->errors = array_merge($this->errors, $parse_errors);
+                $obj->run($this->manufacturerId, $this->feedId, $filePath, $this->testMode);
+                $parseErrors = $obj->getErrors();
+                if (!empty($parseErrors)) {
+                    $this->errors = array_merge($this->errors, $parseErrors);
                 }
                 break;
 
@@ -108,20 +108,20 @@ class ParserUni implements FeedParserInterface
      * Определение метода получения фида
      * @throws \Bitrix\Main\ObjectException
      */
-    private function handle_feed_load_type()
+    private function handleFeedLoadType()
     {
-        $ar_feed = ImportHelper::getFeedInfo(( int )$this->feed_ID);
+        $arFeed = ImportHelper::getFeedInfo(( int )$this->feedId);
 
-        switch ($ar_feed['load_type']) {
+        switch ($arFeed['load_type']) {
 
             // Если фид - это файл, работаем с ним
             case 'file':
-                $this->feed_from_file($ar_feed);
+                $this->feedFromFile($arFeed);
                 break;
 
             // Если фид - это ссылка на URL, то получаем инфу http-запросом
             case 'link':
-                $this->feed_from_url($ar_feed);
+                $this->feedFromUrl($arFeed);
                 break;
 
         }
@@ -130,33 +130,33 @@ class ParserUni implements FeedParserInterface
     /**
      * Получение фида из файла
      */
-    private function feed_from_file($feed)
+    private function feedFromFile($feed)
     {
-        $file_ID = ( int )$feed['file_id'];
+        $fileId = ( int )$feed['file_id'];
 
-        if ($file_ID <= 0) {
+        if ($fileId <= 0) {
             $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Получен некорректный ID файла'];
-            $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Некорректный ID файла', 'feed_id' => $this->feed_ID]);
+            $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Некорректный ID файла', 'feed_id' => $this->feedId]);
             return;
         }
 
-        $file_path = $_SERVER['DOCUMENT_ROOT'] . \CFile::GetPath($file_ID);
+        $filePath = $_SERVER['DOCUMENT_ROOT'] . \CFile::GetPath($fileId);
 
-        if (!file_exists($file_path)) {
+        if (!file_exists($filePath)) {
             $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Получен путь до несуществующего файла'];
-            $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Файл отсутствует', 'feed_id' => $this->feed_ID, 'file_id' => $file_ID]);
+            $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Файл отсутствует', 'feed_id' => $this->feedId, 'file_id' => $fileId]);
             return;
         }
 
-        $this->handle_file_type($file_path);
+        $this->handleFileType($filePath);
     }
 
     /**
      * Получение фида из URL
      */
-    private function feed_from_url($feed)
+    private function feedFromUrl($feed)
     {
-        $this->logger->addToLog('parser set files paths', '', ['msg' => 'Получаем файл по ссылке', 'link' => $feed['feed_url'], 'feed_id' => $this->feed_ID]);
+        $this->logger->addToLog('parser set files paths', '', ['msg' => 'Получаем файл по ссылке', 'link' => $feed['feed_url'], 'feed_id' => $this->feedId]);
 
         $username = $feed['link_login'];
         $password = $feed['link_password'];
@@ -171,60 +171,60 @@ class ParserUni implements FeedParserInterface
             curl_setopt($curl, CURLOPT_USERPWD, $username . ":" . $password);
         }
 
-        $file_content = curl_exec($curl);
-        $curl_response_code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $fileContent = curl_exec($curl);
+        $curlResponseCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         curl_close($curl);
 
-        if (!$file_content) {
-            $this->logger->addToLog('parser set files paths', '', ['msg' => 'Ошибка получения файла', 'link' => $feed['feed_url'], 'feed_id' => $this->feed_ID]);
+        if (!$fileContent) {
+            $this->logger->addToLog('parser set files paths', '', ['msg' => 'Ошибка получения файла', 'link' => $feed['feed_url'], 'feed_id' => $this->feedId]);
             $this->errors['Файл'][] = ['level' => 1, 'msg' => 'Ошибка получения файла - '. $feed['feed_url']];
             return;
         }
 
-        if ($curl_response_code === 401) {
+        if ($curlResponseCode === 401) {
             $this->errors['Файл'][] = ['level' => 1, 'msg' => 'Ошибка авторизации'];
             return;
         }
 
-        $file_name = $this->manufacturer_ID . '_feed_file';
-        $file_path_full = $this->temp_folder . $file_name;
-        file_put_contents($file_path_full, $file_content);
+        $fileName = $this->manufacturerId . '_feed_file';
+        $filePathFull = $this->tempFolder . $fileName;
+        file_put_contents($filePathFull, $fileContent);
 
-        $this->handle_file_type($file_path_full);
+        $this->handleFileType($filePathFull);
     }
 
     /**
      * Распаковка архива ZIP
-     * @param string $file_path Путь к файлу фида
+     * @param string $filePath Путь к файлу фида
      */
-    private function unpack_zip($file_path)
+    private function unpackZip($filePath)
     {
         $zip = new \ZipArchive;
-        $res = $zip->open($file_path);
+        $res = $zip->open($filePath);
 
         // Если фид - это архив, то распаковываем и возвращаем массив путей к файлам
         if ($res === true) {
-            $ar_file_path = explode('/', $file_path);
+            $arFilePath = explode('/', $filePath);
 
-            $unzip_path = $this->temp_folder . end($ar_file_path) . '_unzip/';
-            $unzip_success = $zip->extractTo($unzip_path);
+            $unzipPath = $this->tempFolder . end($arFilePath) . '_unzip/';
+            $unzipSuccess = $zip->extractTo($unzipPath);
 
-            if (!$unzip_success) {
-                $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Ошибка распаковки архива', 'filePath' => $file_path]);
-                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Ошибка распаковки архива - '. end(explode('/', $file_path))];
+            if (!$unzipSuccess) {
+                $this->logger->addToLog('parser set files paths', 'error', ['msg' => 'Ошибка распаковки архива', 'filePath' => $filePath]);
+                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Ошибка распаковки архива - '. end(explode('/', $filePath))];
                 return;
             }
 
-            $this->logger->addToLog('parser set files paths', '', ['msg' => 'Успешно распаковали архив', 'filePath' => $file_path]);
+            $this->logger->addToLog('parser set files paths', '', ['msg' => 'Успешно распаковали архив', 'filePath' => $filePath]);
 
-            $num_files = $zip->numFiles;
+            $numFiles = $zip->numFiles;
 
-            for ($i = 0; $i < $num_files; $i++) {
-                $ar_item = $zip->statIndex($i);
-                $unzip_file_path = $unzip_path . $ar_item['name'];
+            for ($i = 0; $i < $numFiles; $i++) {
+                $arItem = $zip->statIndex($i);
+                $unzipFilePath = $unzipPath . $arItem['name'];
 
-                if (is_file($unzip_file_path)) {
-                    $this->handle_file_type($unzip_file_path);
+                if (is_file($unzipFilePath)) {
+                    $this->handleFileType($unzipFilePath);
                 }
             }
         }
@@ -232,32 +232,32 @@ class ParserUni implements FeedParserInterface
 
     /**
      * Обработчик типа файла
-     * @param string $file_path Путь к файлу фида
+     * @param string $filePath Путь к файлу фида
      */
-    private function handle_file_type($file_path)
+    private function handleFileType($filePath)
     {
-        $file_type = Files::getMimeType($file_path);
+        $fileType = Files::getMimeType($filePath);
 
-        switch ($file_type) {
+        switch ($fileType) {
 
             case 'application/zip':
-                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён архив - ' . $file_path, 'feed_id' => $this->feed_ID]);
-                $this->unpack_zip($file_path);
+                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён архив - ' . $filePath, 'feed_id' => $this->feedId]);
+                $this->unpackZip($filePath);
                 break;
 
             case 'application/vnd.ms-excel':
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Формат XLS не поддерживается!', 'feed_id' => $this->feed_ID]);
-                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Формат XLS не поддерживается! - '. end(explode('/', $file_path))];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Формат XLS не поддерживается!', 'feed_id' => $this->feedId]);
+                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Формат XLS не поддерживается! - '. end(explode('/', $filePath))];
                 break;
 
             case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён файл xlsx - ' . end(explode('/', $file_path)), 'feed_id' => $this->feed_ID]);
-                $this->ar_files_paths[$file_path] = 'Xlsx';
+                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён файл xlsx - ' . end(explode('/', $filePath)), 'feed_id' => $this->feedId]);
+                $this->arFilesPaths[$filePath] = 'Xlsx';
                 break;
 
             case 'application/xml':
-                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён файл xml - ' . $file_path, 'feed_id' => $this->feed_ID]);
-                $this->ar_files_paths[$file_path] = 'Xml';
+                $this->logger->addToLog('parse feed', 'success', ['msg' => 'Определён файл xml - ' . $filePath, 'feed_id' => $this->feedId]);
+                $this->arFilesPaths[$filePath] = 'Xml';
                 break;
 
             case 'application/pdf':
@@ -301,8 +301,8 @@ class ParserUni implements FeedParserInterface
                 break;
 
             default:
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Тип файла не определен или не поддерживается - ' . $file_path, 'feed_id' => $this->feed_ID]);
-                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Тип файла не определен или не поддерживается - ' . end(explode('/', $file_path))];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Тип файла не определен или не поддерживается - ' . $filePath, 'feed_id' => $this->feedId]);
+                $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Тип файла не определен или не поддерживается - ' . end(explode('/', $filePath))];
                 break;
 
         }
