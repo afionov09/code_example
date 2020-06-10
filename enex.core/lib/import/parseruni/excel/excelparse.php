@@ -25,9 +25,9 @@ class ExcelParse
     // Передаваемые данные
     //
 
-    private $feed_ID;
+    private $feedId;
 
-    private $test_mode;
+    private $testMode;
 
     //
     // Данные парсера
@@ -36,17 +36,17 @@ class ExcelParse
     /**
      * ID производителя в HL блоке
      */
-    private $hl_block_manuf_id;
+    private $hlBlockManufId;
 
     /**
      * XML ID производителя
      */
-    private $hl_block_manuf_xml_id;
+    private $hlBlockManufXmlId;
 
     /**
      * Рут директория фида для формирования путей изображений
      */
-    private $feed_root_dir;
+    private $feedRootDir;
 
     //
     // SiteCore tools
@@ -59,7 +59,7 @@ class ExcelParse
     /**
      * Список свойств товаров с платформы
      */
-    private $platform_props = array();
+    private $platformProps = array();
 
     //
     // Массивы индексов свойств товаров
@@ -68,32 +68,32 @@ class ExcelParse
     /**
      * Массив индексов и имён основных свойств (индексы габаритов и изображений не включены).
      */
-    private $main_props_indexes = array();
+    private $mainPropsIndexes = array();
 
     /**
      * Массив индексов и имён габаритов товара (обязательные свойства).
      */
-    private $dim_props_indexes = array();
+    private $dimPropsIndexes = array();
 
     /**
      * Массив индексов и имён дополнительных свойств.
      */
-    private $goods_props_indexes = array();
+    private $goodsPropsIndexes = array();
     
     /**
      * Массив индексов строк, которые необходимо проверить на равенство 0.
      */
-    private $check_props_indexes = array();
+    private $checkPropsIndexes = array();
     
     /**
      * Массив путей изображений
      */
-    private $images_dirs_indexes = array();
+    private $imagesDirsIndexes = array();
     
     /**
      * Массив индексов секций каталога.
      */
-    private $sections_indexes = array();
+    private $sectionsIndexes = array();
 
     //
     //
@@ -117,12 +117,12 @@ class ExcelParse
      * Номер строки, с которой начинается обработка выгрузки (используется это значение, если в параметрах строка не указана).
      * Для PhpSpreadsheet индекс начальной строки = 1.
      */
-    private $start_row = 1;
+    private $startRow = 1;
     
     /**
      * Индекс листа в выгрузке с товарами.
      */
-    private $active_sheet = 0;
+    private $activeSheet = 0;
 
     /**
      * Размер чанка позиций, на которые делится выгрузка в фильтре.
@@ -155,113 +155,113 @@ class ExcelParse
     /**
      * Основной метод парсера
      *
-     * @param int $user_manufacturer_ID
+     * @param int $userManufacturerId
      * ID пользователя - производителя
-     * @param int $feed_ID
+     * @param int $feedId
      * ID фида
-     * @param string $file_path
+     * @param string $filePath
      * Путь к обрабатываемому файлу
-     * @param bool $test_mode
+     * @param bool $testMode
      * Флаг тестового режима
      */
-    public function run($user_manufacturer_ID, $feed_ID, $file_path, $test_mode)
+    public function run($userManufacturerId, $feedId, $filePath, $testMode)
     {
-        $this->test_mode = $test_mode;
-        $this->feed_ID = $feed_ID;
-        $this->hl_block_manuf_id = UserRepository::getManufacturerHlIdByUserId($user_manufacturer_ID);
-        $this->hl_block_manuf_xml_id = UserRepository::getManufacturerXmlIdByUserId($user_manufacturer_ID);
-        unset($test_mode, $feed_ID);
+        $this->testMode = $testMode;
+        $this->feedId = $feedId;
+        $this->hlBlockManufId = UserRepository::getManufacturerHlIdByUserId($userManufacturerId);
+        $this->hlBlockManufXmlId = UserRepository::getManufacturerXmlIdByUserId($userManufacturerId);
+        unset($testMode, $feedId);
 
-        $this->feed_root_dir = substr($file_path, 0, strripos($file_path, '/', -1)) . '/';
-        if ($this->feed_root_dir == '') {
-            $this->logger->addToLog('excel parse', 'error', ['msg' => 'Не определена директория фида', 'feed_id' => $this->feed_ID]);
+        $this->feedRootDir = substr($filePath, 0, strripos($filePath, '/', -1)) . '/';
+        if ($this->feedRootDir == '') {
+            $this->logger->addToLog('excel parse', 'error', ['msg' => 'Не определена директория фида', 'feed_id' => $this->feedId]);
             $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Не определена директория фида'];
             return;
         }
-        $this->logger->addToLog('excel parse', 'success', ['msg' => 'Определена директория фида', 'feed_id' => $this->feed_ID, 'path' => $this->feed_root_dir]);
+        $this->logger->addToLog('excel parse', 'success', ['msg' => 'Определена директория фида', 'feed_id' => $this->feedId, 'path' => $this->feedRootDir]);
 
-        $this->platform_props = $this->get_platform_props_arr();
-        $handle_params = $this->get_props_indexes_arrs();
-        if (!$handle_params) {
+        $this->platformProps = $this->getPlatformPropsArr();
+        $handleParams = $this->getPropsIndexesArrs();
+        if (!$handleParams) {
             return;
         }
         
-        $start_row = $this->start_row;
-        $end_row = $this->chunk;
-        $this->logger->addToLog('excel parse', '', ['msg' => 'Начинаем обработку '. end(explode('/', $file_path)), 'feed_id' => $this->feed_ID ]);
+        $startRow = $this->startRow;
+        $endRow = $this->chunk;
+        $this->logger->addToLog('excel parse', '', ['msg' => 'Начинаем обработку '. end(explode('/', $filePath)), 'feed_id' => $this->feedId ]);
 
         while (true) {
             $reader = IOFactory::createReader('Xlsx');
             $reader->setReadDataOnly(true);
-            $reader->setReadFilter(new ExcelFilter($start_row, $end_row));
-            $spreadsheet = $reader->load($file_path);
-            $this->worksheet = $spreadsheet->setActiveSheetIndex($this->active_sheet);
+            $reader->setReadFilter(new ExcelFilter($startRow, $endRow));
+            $spreadsheet = $reader->load($filePath);
+            $this->worksheet = $spreadsheet->setActiveSheetIndex($this->activeSheet);
 
-            foreach ($this->worksheet->getRowIterator($start_row) as $row) {
-                $row_index = $row->getRowIndex();
+            foreach ($this->worksheet->getRowIterator($startRow) as $row) {
+                $rowIndex = $row->getRowIndex();
 
                 if (!$this->worksheet->getRowDimension($row->getRowIndex())->getVisible()) {
-                    echo 'Not visible - row : '. $row_index;
+                    echo 'Not visible - row : '. $rowIndex;
                 }
 
-                if ($this->check_product_important_values($row_index)) {
-                    $main_props_values = $this->get_main_props($row_index);
+                if ($this->checkProductImportantValues($rowIndex)) {
+                    $mainPropsValues = $this->getMainProps($rowIndex);
 
-                    $dim_props_values  = $this->get_dim_props($row_index);
+                    $dimPropsValues  = $this->getDimProps($rowIndex);
 
-                    $ar_images         = $this->get_images($row_index, $main_props_values['Article']);
+                    $arImages        = $this->getImages($rowIndex, $mainPropsValues['Article']);
 
-                    $section_code      = $this->get_section_code($row_index);
+                    $sectionCode     = $this->getSectionCode($rowIndex);
 
-                    $props_values      = $this->get_props_values($row_index, $main_props_values, $dim_props_values);
+                    $propsValues     = $this->getPropsValues($rowIndex, $mainPropsValues, $dimPropsValues);
 
-                    $ar_item = [
-                        'manufacturer_id' => $user_manufacturer_ID,
-                        'feed_id'         => $this->feed_ID,
+                    $arItem = [
+                        'manufacturer_id' => $userManufacturerId,
+                        'feed_id'         => $this->feedId,
                         'active'          => 'Y',
 
-                        'name'            => $main_props_values['Name'],
-                        'ekn'             => $main_props_values['Article'],  //артикул
-                        'description'     => $main_props_values['Description'],
-                        'price'           => $main_props_values['Price'],
-                        'currency'        => $main_props_values['Currency'],
+                        'name'            => $mainPropsValues['Name'],
+                        'ekn'             => $mainPropsValues['Article'],  //артикул
+                        'description'     => $mainPropsValues['Description'],
+                        'price'           => $mainPropsValues['Price'],
+                        'currency'        => $mainPropsValues['Currency'],
 
-                        'section'         => $section_code,
+                        'section'         => $sectionCode,
 
-                        'images'          => json_encode($ar_images, JSON_UNESCAPED_UNICODE),
+                        'images'          => json_encode($arImages, JSON_UNESCAPED_UNICODE),
 
-                        'length'          => $dim_props_values['Length'],
-                        'width'           => $dim_props_values['Width'],
-                        'height'          => $dim_props_values['Height'],
-                        'weight'          => $dim_props_values['Weight'], //В граммах
+                        'length'          => $dimPropsValues['Length'],
+                        'width'           => $dimPropsValues['Width'],
+                        'height'          => $dimPropsValues['Height'],
+                        'weight'          => $dimPropsValues['Weight'], //В граммах
 
                         'measure'         => '', //Битрикс код ЕИ !ТОВАРА!
 
-                        'props_values'    => json_encode($props_values['props'], JSON_UNESCAPED_UNICODE), //Основные свойства : Магазин -> Каталог товаров Enex -> Свойства товаров.
-                        'additional_props_values'=> json_encode($props_values['additional_props'], JSON_UNESCAPED_UNICODE), //Доп свойства - дописываются как информация.
+                        'props_values'    => json_encode($propsValues['props'], JSON_UNESCAPED_UNICODE), //Основные свойства : Магазин -> Каталог товаров Enex -> Свойства товаров.
+                        'additional_props_values'=> json_encode($propsValues['additional_props'], JSON_UNESCAPED_UNICODE), //Доп свойства - дописываются как информация.
                     ];
 
-                    if ($this->test_mode === false) {
-                        $this->import($ar_item);
+                    if ($this->testMode === false) {
+                        $this->import($arItem);
                     }
-                    $this->logger->addToLog('excel parse', 'success', ['msg' => 'Обработана строка : ' . $row->getRowIndex(), 'feed_id' => $this->feed_ID ]);
+                    $this->logger->addToLog('excel parse', 'success', ['msg' => 'Обработана строка : ' . $row->getRowIndex(), 'feed_id' => $this->feedId ]);
                     continue;
                 }
 
-                $this->logger->addToLog('excel parse', 'error', ['msg' => 'Ошибка в обработке строки : ' . $row->getRowIndex(), 'feed_id' => $this->feed_ID]);
+                $this->logger->addToLog('excel parse', 'error', ['msg' => 'Ошибка в обработке строки : ' . $row->getRowIndex(), 'feed_id' => $this->feedId]);
             }
 
             Calculation::getInstance($spreadsheet)->clearCalculationCache();
 
-            if ($end_row > $this->worksheet->getHighestRow($this->main_props_indexes['Article'])) {
+            if ($endRow > $this->worksheet->getHighestRow($this->mainPropsIndexes['Article'])) {
                 break;
             }
 
             unset($reader, $spreadsheet);
             $this->worksheet = '';
 
-            $start_row = ++$end_row;
-            $end_row += $this->chunk;
+            $startRow = ++$endRow;
+            $endRow += $this->chunk;
         }
     }
 
@@ -272,9 +272,9 @@ class ExcelParse
     /**
      * Получить массив свойств с платформы
      *
-     * @return array $arr_platform_props
+     * @return array $arrPlatformProps
      */
-    private function get_platform_props_arr()
+    private function getPlatformPropsArr()
     {
         $rsProps = \CIBlockProperty::GetList(
             array( 'SORT' => 'ASC',
@@ -282,13 +282,13 @@ class ExcelParse
             array( 'IBLOCK_ID' => $this->core->getIblockId($this->core::IBLOCK_CODE_CATALOG_NEW) )
         );
 
-        $arr_platform_props = [];
+        $arrPlatformProps = [];
 
         while ($arProp = $rsProps->Fetch()) {
-            $arr_platform_props[trim($arProp['NAME'])] = trim($arProp['CODE']);
+            $arrPlatformProps[trim($arProp['NAME'])] = trim($arProp['CODE']);
         }
 
-        return $arr_platform_props;
+        return $arrPlatformProps;
     }
 
     /**
@@ -298,24 +298,24 @@ class ExcelParse
      * @return $params_file_path
      * Путь до найденного файла параметров
      */
-    private function get_params_file_path()
+    private function getParamsFilePath()
     {
         $HLBlock = new HLBlock();
         $paramsEntity = $HLBlock->getHlEntityByName($this->core::HLBLOCK_CODE_PARSER_PARAMS);
         $params = $paramsEntity::getList([
             'select' => ['UF_PARAMS_FILE'],
-            'filter' => ['UF_MANUF_XML_ID' => $this->hl_block_manuf_id],
+            'filter' => ['UF_MANUF_XML_ID' => $this->hlBlockManufId],
             'limit' => 1
         ])->fetch();
 
         if ($params === false) {
-            $this->logger->addToLog('excel feed params', 'error', ['msg' => 'Не найден файл параметров', 'feed_id' => $this->feed_ID ]);
+            $this->logger->addToLog('excel feed params', 'error', ['msg' => 'Не найден файл параметров', 'feed_id' => $this->feedId ]);
             $this->errors['Парсер'][] = ['level' => 1, 'msg' => 'Не найден файл параметров обработки фида'];
             return false;
         }
 
-        $doc_root = str_replace('/local/modules/citfact.sitecore/lib/import/feedparsers/parseruni/excel', '', __DIR__);
-        $path = $doc_root.\CFile::GetPath($params['UF_PARAMS_FILE']);
+        $docRoot = str_replace('/local/modules/enex.core/lib/import/parseruni/excel', '', __DIR__);
+        $path = $docRoot.\CFile::GetPath($params['UF_PARAMS_FILE']);
         return $path;
     }
 
@@ -327,9 +327,9 @@ class ExcelParse
      * @return true
      * Массивы индексов для обработки сформированы
      */
-    private function get_props_indexes_arrs()
+    private function getPropsIndexesArrs()
     {
-        $path = $this->get_params_file_path();
+        $path = $this->getParamsFilePath();
         if (!$path) {
             return false;
         }
@@ -337,34 +337,34 @@ class ExcelParse
         $json = \Bitrix\Main\IO\File::getFileContents($path);
         $props = json_decode($json, true);
 
-        $this->logger->addToLog('excel feed params', '', ['msg' => 'Запоминаем индексы свойств', 'feed_id' => $this->feed_ID]);
+        $this->logger->addToLog('excel feed params', '', ['msg' => 'Запоминаем индексы свойств', 'feed_id' => $this->feedId]);
 
-        foreach ($props as $prop_name => $prop_cell) {
-            switch ($prop_name) {
+        foreach ($props as $propName => $propCell) {
+            switch ($propName) {
 
                 // Заполнение массива индексов изображений.
                 case 'Images':
-                    $images_arr = array_keys($prop_cell);
-                    foreach ($images_arr as $image_dir) {
-                        $this->images_dirs_indexes[] = $prop_cell[$image_dir];
+                    $images_arr = array_keys($propCell);
+                    foreach ($images_arr as $imageDir) {
+                        $this->imagesDirsIndexes[] = $propCell[$imageDir];
                     }
 
                     break;
                     
                 //Заполнение массива индексов столбцов с уровнями дерева каталога.
                 case 'Catalogs':
-                    $catalog_array = array_keys($prop_cell);
-                    foreach ($catalog_array as $catalog_ID) {
-                        $this->sections_indexes[$catalog_ID] = $prop_cell[$catalog_ID];
+                    $catalogArray = array_keys($propCell);
+                    foreach ($catalogArray as $catalogId) {
+                        $this->sectionsIndexes[$catalogId] = $propCell[$catalogId];
                     }
                     
                     break;
                 
                 //Заполнение массива индексов размеров товара, веса и ЕИ.
                 case 'Dimensions':
-                    $dim_props_array = array_keys($prop_cell);
-                    foreach ($dim_props_array as $dim_prop_name) {
-                        $this->dim_props_indexes[$dim_prop_name] = $prop_cell[$dim_prop_name];
+                    $dim_props_array = array_keys($propCell);
+                    foreach ($dim_props_array as $dimPropName) {
+                        $this->dimPropsIndexes[$dimPropName] = $propCell[$dimPropName];
                     }
                     
                     break;
@@ -374,20 +374,20 @@ class ExcelParse
                 
                     foreach ($props['Properties'] as $property) {
                         if (!is_null($property['Column'])) {
-                            $this->goods_props_indexes[$property['Name']]['Column'] = $property['Column'];
+                            $this->goodsPropsIndexes[$property['Name']]['Column'] = $property['Column'];
                         }
-                        $this->goods_props_indexes[$property['Name']]['PropType'] = $property['PropType'];
-                        $this->goods_props_indexes[$property['Name']]['ValueType'] = $property['ValueType'];
+                        $this->goodsPropsIndexes[$property['Name']]['PropType'] = $property['PropType'];
+                        $this->goodsPropsIndexes[$property['Name']]['ValueType'] = $property['ValueType'];
                     }
                     
                     break;
                     
                 //Заполнение массива индексов столбцов выгрузки для проверки на != 0
                 case 'Check':
-                    $check_list = array_keys($prop_cell);
-                    foreach ($check_list as $check_cell) {
-                        if (!is_null($prop_cell[$check_cell])) {
-                            $this->check_props_indexes[] = $prop_cell[$check_cell];
+                    $checkList = array_keys($propCell);
+                    foreach ($checkList as $checkCell) {
+                        if (!is_null($propCell[$checkCell])) {
+                            $this->checkPropsIndexes[] = $propCell[$checkCell];
                         }
                     }
                     
@@ -395,43 +395,43 @@ class ExcelParse
                     
                 //Заполнение стартовой строки для обработки выгрузки
                 case 'Start':
-                    if (!is_null($prop_cell)) {
-                        $this->start_row = $prop_cell;
+                    if (!is_null($propCell)) {
+                        $this->startRow = $propCell;
                     }
 
                     break;
                 
                 //Заполнение индекса листа для обработки
                 case 'Content_Sheet':
-                    if (!is_null($prop_cell)) {
-                        $this->active_sheet = $prop_cell;
+                    if (!is_null($propCell)) {
+                        $this->activeSheet = $propCell;
                     }
 
                     break;
                     
                 //Заполнение флага НДС
                 case 'VAT_Price':
-                    $this->vat = $prop_cell;
+                    $this->vat = $propCell;
                     
                     break;
                 
                 //Заполнение оставшихся свойств
                 //Article || Name || Description || Country || Price || Currency || MinumumOrder
                 default:
-                    if (is_null($prop_cell) && $prop_name === 'Description') {
-                        $this->main_props_indexes[$prop_name] = '';
+                    if (is_null($propCell) && $propName === 'Description') {
+                        $this->mainPropsIndexes[$propName] = '';
                         break;
                     }
-                    $this->main_props_indexes[$prop_name] = $prop_cell;
+                    $this->mainPropsIndexes[$propName] = $propCell;
                     
                     break;
                     
             }
         }
 
-        unset($prop_name, $prop_cell);
+        unset($propName, $propCell);
 
-        $this->logger->addToLog('excel feed params', 'success', ['msg' => 'Свойства распределены', 'feed_id' => $this->feed_ID]);
+        $this->logger->addToLog('excel feed params', 'success', ['msg' => 'Свойства распределены', 'feed_id' => $this->feedId]);
 
         return true;
     }
@@ -441,7 +441,7 @@ class ExcelParse
     //
 
     /**
-     * Проверка строки на незаполненность необходимых ячеек и на равенство 0 значений ячеек из @var $check_props_indexes.
+     * Проверка строки на незаполненность необходимых ячеек и на равенство 0 значений ячеек из @var $checkPropsIndexes.
      *
      * @param PhpOffice\PhpSpreadsheet\Worksheet\RowCellIterator $cells
      * Итератор ячеек строки.
@@ -451,52 +451,52 @@ class ExcelParse
      * @return true
      * Строка прошла проверку
      */
-    private function check_product_important_values($row_index)
+    private function checkProductImportantValues($rowIndex)
     {
-        foreach ($this->main_props_indexes as $name => $column) {
+        foreach ($this->mainPropsIndexes as $name => $column) {
             if (!preg_match('@[A-z]@u', $column) || $name === 'Currency') {
                 continue;
             }
-            $value = $this->worksheet->getCell($column.$row_index)->getCalculatedValue();
+            $value = $this->worksheet->getCell($column.$rowIndex)->getCalculatedValue();
             if (($value === 0 || $value === '' || is_null($value)) && $name !== 'Description') {
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feed_ID]);
-                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $row_index . ' - Prop name : ' . $name];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feedId]);
+                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $rowIndex . ' - Prop name : ' . $name];
                 return false;
             }
         }
 
         unset($name, $column);
 
-        foreach ($this->dim_props_indexes as $name => $column) {
+        foreach ($this->dimPropsIndexes as $name => $column) {
             if ($name === 'WeightUnit' || $name === 'Unit') {
                 continue;
             }
-            $value = $this->worksheet->getCell($column.$row_index)->getCalculatedValue();
+            $value = $this->worksheet->getCell($column.$rowIndex)->getCalculatedValue();
             if ($value === 0 || $value === '' || is_null($value)) {
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feed_ID]);
-                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $row_index . ' - Prop name : ' . $name];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feedId]);
+                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $rowIndex . ' - Prop name : ' . $name];
                 return false;
             }
         }
 
         unset($name, $column);
 
-        foreach ($this->sections_indexes as $name => $column) {
-            $value = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
+        foreach ($this->sectionsIndexes as $name => $column) {
+            $value = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
             if (($value === 0 || $value === '' || is_null($value)) && ($name !== 'Catalog3' && $name !== 'Catalog4')) {
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feed_ID]);
-                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $row_index . ' - Prop name : ' . $name];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feedId]);
+                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $rowIndex . ' - Prop name : ' . $name];
                 return false;
             }
         }
 
         unset($name, $column);
 
-        foreach ($this->check_props_indexes as $name => $column) {
-            $value = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
+        foreach ($this->checkPropsIndexes as $name => $column) {
+            $value = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
             if ($value === 0 || $value === '' || is_null($value)) {
-                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feed_ID]);
-                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $row_index . ' - Prop name : ' . $name];
+                $this->logger->addToLog('parse feed', 'error', ['msg' => 'Не найдено или равно 0 => Column : ' . $column. ' Свойство : '. $name, 'feed_id' => $this->feedId]);
+                $this->errors['Строка'][] = ['level' => 1, 'msg' => 'Не найдено или равно 0 => Column : ' . $column . ' - Row : '. $rowIndex . ' - Prop name : ' . $name];
                 return false;
             }
         }
@@ -516,44 +516,44 @@ class ExcelParse
      * @param PhpOffice\PhpSpreadsheet\Worksheet\RowCellIterator $cells
      * Итератор ячеек строки.
      *
-     * @return array $main_props_values_temp
+     * @return array $mainPropsValuesTemp
      * Массив имён и значение основных свойств товара
      */
-    private function get_main_props($row_index)
+    private function getMainProps($rowIndex)
     {
-        $main_props_values_temp = [];
+        $mainPropsValuesTemp = [];
 
-        foreach ($this->main_props_indexes as $name => $column) {
+        foreach ($this->mainPropsIndexes as $name => $column) {
             if ($name === 'Currency' || ($name === 'Country' && !preg_match('@[A-z]@u', $column)) || $column === '') {
                 continue;
             }
-            $value = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
-            $main_props_values_temp[$name] = $value;
+            $value = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
+            $mainPropsValuesTemp[$name] = $value;
         }
 
         unset($name, $column);
 
-        if (!isset($main_props_values_temp['Country']) || $main_props_values_temp['Country'] == '') {
-            $main_props_values_temp['Country'] = $this->main_props_indexes['Country'];
+        if (!isset($mainPropsValuesTemp['Country']) || $mainPropsValuesTemp['Country'] == '') {
+            $mainPropsValuesTemp['Country'] = $this->mainPropsIndexes['Country'];
         }
-        if (!isset($main_props_values_temp['Description'])) {
-            $main_props_values_temp['Description'] = '';
+        if (!isset($mainPropsValuesTemp['Description'])) {
+            $mainPropsValuesTemp['Description'] = '';
         }
         
-        $main_props_values_temp['Currency'] = $this->main_props_indexes['Currency'];
+        $mainPropsValuesTemp['Currency'] = $this->mainPropsIndexes['Currency'];
 
         if (!$this->vat) {
-            $price = str_replace(',', '.', $main_props_values_temp['Price']);
+            $price = str_replace(',', '.', $mainPropsValuesTemp['Price']);
             $price = floatval($price) * 1.2;
             $price = number_format($price, 2, '.', '');
-            $main_props_values_temp['Price'] = $price;
+            $mainPropsValuesTemp['Price'] = $price;
         } else {
-            $price = str_replace(',', '.', $main_props_values_temp['Price']);
+            $price = str_replace(',', '.', $mainPropsValuesTemp['Price']);
             $price = floatval($price);
-            $main_props_values_temp['Price'] = $price;
+            $mainPropsValuesTemp['Price'] = $price;
         }
 
-        return $main_props_values_temp;
+        return $mainPropsValuesTemp;
     }
     
     /**
@@ -565,33 +565,33 @@ class ExcelParse
      * @return array $dim_prop_values_temp
      * Массив имён и значений размеров товара и веса
      */
-    private function get_dim_props($row_index)
+    private function getDimProps($rowIndex)
     {
-        $dim_props_values_temp = [];
+        $dimPropsValuesTemp = [];
 
-        foreach ($this->dim_props_indexes as $name => $column) {
+        foreach ($this->dimPropsIndexes as $name => $column) {
             if ($name === 'Unit' || $name === 'WeightUnit') {
                 continue;
             }
-            $value = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
-            $dim_props_values_temp[$name] = $value;
+            $value = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
+            $dimPropsValuesTemp[$name] = $value;
         }
 
         unset($name, $column);
 
-        foreach ($dim_props_values_temp as $dim_prop_name_temp => $dim_prop_value_temp) {
-            switch ($dim_prop_name_temp) {
+        foreach ($dimPropsValuesTemp as $dimPropNameTemp => $dimPropValueTemp) {
+            switch ($dimPropNameTemp) {
                 case 'Weight':
-                    $dim_props_values_temp[$dim_prop_name_temp] = $this->get_dimensions($dim_prop_value_temp, $this->dim_props_indexes['WeightUnit']);
+                    $dimPropsValuesTemp[$dimPropNameTemp] = $this->getDimensions($dimPropValueTemp, $this->dimPropsIndexes['WeightUnit']);
                     break;
 
                 default:
-                    $dim_props_values_temp[$dim_prop_name_temp] = $this->get_dimensions($dim_prop_value_temp, $this->dim_props_indexes['Unit']);
+                    $dimPropsValuesTemp[$dimPropNameTemp] = $this->getDimensions($dimPropValueTemp, $this->dimPropsIndexes['Unit']);
                     break;
             }
         }
 
-        return $dim_props_values_temp;
+        return $dimPropsValuesTemp;
     }
 
     /**
@@ -600,71 +600,71 @@ class ExcelParse
      * @param PhpOffice\PhpSpreadsheet\Worksheet\RowCellIterator $cells
      * Итератор ячеек строки.
      *
-     * @return array $images_dirs_temp
+     * @return array $imagesDirsTemp
      * Массив путей к изображениям
      */
-    private function get_images($row_index, $article)
+    private function getImages($rowIndex, $article)
     {
-        $arr_empty_img_arr_exc = [25];
+        $arrEmptyImgArrExc = [25];
 
-        if (empty($this->images_dirs_indexes) && !in_array($this->hl_block_manuf_id, $arr_empty_img_arr_exc)) {
+        if (empty($this->imagesDirsIndexes) && !in_array($this->hlBlockManufId, $arrEmptyImgArrExc)) {
             return false;
         }
 
-        if ($this->hl_block_manuf_id == 25) {
+        if ($this->hlBlockManufId == 25) {
             $grab = new GrabDeWaltImages();
-            $images_dewalt = $grab->run($article);
+            $imagesDewalt = $grab->run($article);
 
-            $images_dirs_temp = array();
+            $imagesDirsTemp = array();
 
-            foreach ($images_dewalt as $key => $url) {
+            foreach ($imagesDewalt as $key => $url) {
                 if ($key === 0) {
-                    $images_dirs_temp['preview'] = $url;
+                    $imagesDirsTemp['preview'] = $url;
                 } else {
-                    $images_dirs_temp['additional'][] = $url;
+                    $imagesDirsTemp['additional'][] = $url;
                 }
             }
 
-            return $images_dirs_temp;
+            return $imagesDirsTemp;
         }
 
-        $images_dirs_temp = array();
+        $imagesDirsTemp = array();
 
-        foreach ($this->images_dirs_indexes as $key => $column) {
-            $path = trim($this->worksheet->getCell($column . $row_index)->getCalculatedValue());
+        foreach ($this->imagesDirsIndexes as $key => $column) {
+            $path = trim($this->worksheet->getCell($column . $rowIndex)->getCalculatedValue());
             if ($path != '') {
-                $final_path = $path;
+                $finalPath = $path;
                 if (!filter_var($path, FILTER_VALIDATE_URL)) {
-                    $final_path = $this->feed_root_dir . $path;
+                    $finalPath = $this->feedRootDir . $path;
                 }
-                if ($this->hl_block_manuf_id == 97) {
+                if ($this->hlBlockManufId == 97) {
                     $path = strtolower($path);
-                    $final_path = $_SERVER['DOCUMENT_ROOT'] . '/upload/feed_metabo_images/'.$path;
+                    $finalPath = $_SERVER['DOCUMENT_ROOT'] . '/upload/feed_metabo_images/'.$path;
                 }
-                if (empty($images_dirs_temp)) {
-                    $images_dirs_temp['preview'] = $final_path;
+                if (empty($imagesDirsTemp)) {
+                    $imagesDirsTemp['preview'] = $finalPath;
                     continue;
                 }
-                $images_dirs_temp['additional'][] = $final_path;
-            } elseif ($this->hl_block_manuf_id == 28) {
+                $imagesDirsTemp['additional'][] = $finalPath;
+            } elseif ($this->hlBlockManufId == 28) {
                 $grabHikoki = new GrabHikokiImages;
                 $hikokiImages = $grabHikoki->run($article);
                 if (empty($hikokiImages)) {
                     return;
                 }
-                $images_hikoki_temp = [];
+                $imagesHikokiTemp = [];
                 foreach ($hikokiImages as $key => $url) {
                     if ($key === 0) {
-                        $images_hikoki_temp['preview'] = $url;
+                        $imagesHikokiTemp['preview'] = $url;
                     } else {
-                        $images_hikoki_temp['additional'][] = $url;
+                        $imagesHikokiTemp['additional'][] = $url;
                     }
                 }
-                return $images_hikoki_temp;
+                return $imagesHikokiTemp;
             }
         }
 
-        return $images_dirs_temp;
+        return $imagesDirsTemp;
     }
 
     /**
@@ -673,50 +673,50 @@ class ExcelParse
      * @param PhpOffice\PhpSpreadsheet\Worksheet\RowCellIterator $cells
      * Итератор ячеек строки.
      */
-    private function get_props_values($row_index, $main_props_pre, $dim_props_pre)
+    private function getPropsValues($rowIndex, $mainPropsPre, $dimPropsPre)
     {
-        $props_arr_temp = [];
-        $dim_props_arr_temp = [];
-        $props_arr_to_show = [];
+        $propsArrTemp = [];
+        $dimPropsArrTemp = [];
+        $propsArrToShow = [];
 
-        $country = $main_props_pre['Country'];
-        $article = $main_props_pre['Article'];
-        $min_order = $main_props_pre['MinimumOrder'];
+        $country = $mainPropsPre['Country'];
+        $article = $mainPropsPre['Article'];
+        $minOrder = $mainPropsPre['MinimumOrder'];
 
-        unset($main_props_pre);
+        unset($mainPropsPre);
 
-        $props_arr_to_show['props']['MANUFACTURER'] = $this->hl_block_manuf_xml_id;
-        $props_arr_to_show['props']['STRANA_PROIZVODSTVA'] = $this->get_country_outer_code($country);
-        $props_arr_to_show['props']['CML2_ARTICLE'] = $article;
-        $props_arr_to_show['props']['MIN_ORDER'] = $min_order;
+        $propsArrToShow['props']['MANUFACTURER'] = $this->hlBlockManufXmlId;
+        $propsArrToShow['props']['STRANA_PROIZVODSTVA'] = $this->getCountryOuterCode($country);
+        $propsArrToShow['props']['CML2_ARTICLE'] = $article;
+        $propsArrToShow['props']['MIN_ORDER'] = $minOrder;
 
-        foreach ($this->goods_props_indexes as $name => $info_arr) {
-            $column = $info_arr['Column'];
-            $value = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
+        foreach ($this->goodsPropsIndexes as $name => $infoArr) {
+            $column = $infoArr['Column'];
+            $value = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
             if ($value != '') {
-                $props_arr_temp[$name]['Value'] = $value;
-                $props_arr_temp[$name]['PropType'] = $info_arr['PropType'];
-                $props_arr_temp[$name]['ValueType'] = $info_arr['ValueType'];
+                $propsArrTemp[$name]['Value'] = $value;
+                $propsArrTemp[$name]['PropType'] = $infoArr['PropType'];
+                $propsArrTemp[$name]['ValueType'] = $infoArr['ValueType'];
             }
         }
 
-        unset($name, $info_arr);
+        unset($name, $infoArr);
 
-        foreach ($props_arr_temp as $name => $info_arr) {
-            switch ($info_arr['PropType']) {
+        foreach ($propsArrTemp as $name => $infoArr) {
+            switch ($infoArr['PropType']) {
                 case 'main':
                     $name = trim($name);
-                    if ($info_arr['ValueType'] == 'N') {
-                        $info_arr['Value'] = floatval(str_replace(',', '.', $info_arr['Value']));
+                    if ($infoArr['ValueType'] == 'N') {
+                        $infoArr['Value'] = floatval(str_replace(',', '.', $infoArr['Value']));
                     } else {
-                        $info_arr['Value'] = strval($info_arr['Value']);
+                        $infoArr['Value'] = strval($infoArr['Value']);
                     }
 
-                    if (array_key_exists($name, $this->platform_props)) {
-                        $props_arr_to_show['props'][$this->platform_props[$name]] = $info_arr['Value'];
+                    if (array_key_exists($name, $this->platformProps)) {
+                        $propsArrToShow['props'][$this->platformProps[$name]] = $infoArr['Value'];
                         break;
                     }
-                    $this->logger->addToLog('excel parse', '', ['msg' => 'Обнаружено новое основное свойство : ' . $name, 'feed_id' => $this->feed_ID]);
+                    $this->logger->addToLog('excel parse', '', ['msg' => 'Обнаружено новое основное свойство : ' . $name, 'feed_id' => $this->feedId]);
 
                     $code = strtoupper(\CUtil::translit($name, 'ru', ['replace_space' => '_', 'replace_other' => '_']));
                     /**
@@ -729,37 +729,37 @@ class ExcelParse
                         "ACTIVE" => "Y",
                         "SORT" => "500",
                         "CODE" => $code,
-                        "PROPERTY_TYPE" => $info_arr['ValueType'],
+                        "PROPERTY_TYPE" => $infoArr['ValueType'],
                         'SMART_FILTER' => 'Y',
                         "IBLOCK_ID" => $this->core->getIblockId($this->core::IBLOCK_CODE_CATALOG_NEW),
                     ];
                     $ibp = new \CIBlockProperty;
                     $propId = $ibp->add($arFields);
                     if (!$propId) {
-                        $this->logger->addToLog('excel parse', 'error', ['msg' => 'Ошибка при добавлении свойства : ' . $name, 'error' => var_dump($ibp->LAST_ERROR) ,'feed_id' => $this->feed_ID]);
+                        $this->logger->addToLog('excel parse', 'error', ['msg' => 'Ошибка при добавлении свойства : ' . $name, 'error' => var_dump($ibp->LAST_ERROR) ,'feed_id' => $this->feedId]);
                     } else {
-                        $props_arr_to_show['props'][$code] = $info_arr['Value'];
-                        $this->logger->addToLog('excel parse', 'success', ['msg' => 'Свойство ' . $name. ' успешно добавлено', 'feed_id' => $this->feed_ID]);
-                        $this->platform_props = $this->get_platform_props_arr();
+                        $propsArrToShow['props'][$code] = $infoArr['Value'];
+                        $this->logger->addToLog('excel parse', 'success', ['msg' => 'Свойство ' . $name. ' успешно добавлено', 'feed_id' => $this->feedId]);
+                        $this->platformProps = $this->getPlatformPropsArr();
                     }
 
                     break;
 
                 case 'additional':
-                    $props_arr_to_show['additional_props'][$name] = $info_arr['Value'];
+                    $propsArrToShow['additional_props'][$name] = $infoArr['Value'];
                     break;
             }
         }
 
-        unset($name, $info_arr);
+        unset($name, $infoArr);
 
-        $dim_props_arr_temp = $this->get_dims_to_show($dim_props_pre);
-        unset($dim_props_pre);
-        foreach ($dim_props_arr_temp as $name => $value) {
-            $props_arr_to_show['props'][$this->platform_props[$name]] = $value;
+        $dimPropsArrTemp = $this->getDimsToShow($dimPropsPre);
+        unset($dimPropsPre);
+        foreach ($dimPropsArrTemp as $name => $value) {
+            $propsArrToShow['props'][$this->platformProps[$name]] = $value;
         }
 
-        return $props_arr_to_show;
+        return $propsArrToShow;
     }
 
     //
@@ -769,15 +769,15 @@ class ExcelParse
     /**
      * Получить корректные для базы значения размеров и веса товара
      *
-     * @param float|int $dim_value
+     * @param float|int $dimValue
      * Текущее значение размера или веса
-     * @param string $dim_unit
+     * @param string $dimUnit
      * ЕИ размера или веса
      */
-    private function get_dimensions($dim_value, $dim_unit)
+    private function getDimensions($dimValue, $dimUnit)
     {
-        $dim_value = str_replace(',', '.', $dim_value);
-        $ar_units = [
+        $dimValue = str_replace(',', '.', $dimValue);
+        $arUnits = [
             'м' => 1000,
             'мм' => 1,
 
@@ -792,8 +792,8 @@ class ExcelParse
             'g' => 1
         ];
 
-        $dim_value_temp = floatval($dim_value) * $ar_units[$dim_unit];  // Размеры в базу вносим в мм
-        return $dim_value_temp;
+        $dimValueTemp = floatval($dimValue) * $arUnits[$dimUnit];  // Размеры в базу вносим в мм
+        return $dimValueTemp;
     }
 
     /**
@@ -807,9 +807,9 @@ class ExcelParse
      * @return bool
      * false - Страна не найдена
      */
-    private function get_country_outer_code($country)
+    private function getCountryOuterCode($country)
     {
-        $ar_countries = [
+        $arCountries = [
             'Австрия' => 'АВСТРИЯ',
 
             'BY' => 'БЕЛАРУСЬ',
@@ -868,8 +868,8 @@ class ExcelParse
             'Япония' => 'ЯПОНИЯ'
         ];
 
-        if (isset($ar_countries[$country])) {
-            return $ar_countries[$country];
+        if (isset($arCountries[$country])) {
+            return $arCountries[$country];
         }
         return false;
     }
@@ -880,131 +880,131 @@ class ExcelParse
      * @param PhpOffice\PhpSpreadsheet\Worksheet\RowCellIterator $cells
      * Итератор ячеек строки.
      *
-     * @return $section_ID
+     * @return $sectionId
      */
-    private function get_section_code($row_index)
+    private function getSectionCode($rowIndex)
     {
-        $section_ID = false;
+        $sectionId = false;
 
-        $ar_sections_names = [];
+        $arSectionsNames = [];
 
-        foreach ($this->sections_indexes as $column) {
-            $section_name = $this->worksheet->getCell($column . $row_index)->getCalculatedValue();
-            if ($section_name == '') {
+        foreach ($this->sectionsIndexes as $column) {
+            $sectionName = $this->worksheet->getCell($column . $rowIndex)->getCalculatedValue();
+            if ($sectionName == '') {
                 break;
             }
-            $ar_sections_names[] = trim($section_name);
+            $arSectionsNames[] = trim($sectionName);
         }
 
         $obSection = new \CIBlockSection();
-        foreach ($ar_sections_names as $section_name) {
+        foreach ($arSectionsNames as $sectionName) {
 
                 // Ищем раздел по имени и ID родительского раздела
             // В $sectionId присваиваем ID найденного
             // И следующая итерация цикла будет уже с новым значением $sectionId
             // print_r("\n Ищем раздел: " . $sectionName . "\n");
 
-            $ar_filter = array(
+            $arFilter = array(
                     "IBLOCK_ID" => $this->core->getIblockId($this->core::IBLOCK_CODE_CATALOG_NEW),
-                    'SECTION_ID' => $section_ID,
-                    'NAME' => $section_name,
+                    'SECTION_ID' => $sectionId,
+                    'NAME' => $sectionName,
                 );
 
-            $rs_sections = \CIBlockSection::GetList([], $ar_filter, false, array( 'ID', 'IBLOCK_SECTION_ID', 'NAME' ));
+            $rsSections = \CIBlockSection::GetList([], $arFilter, false, array( 'ID', 'IBLOCK_SECTION_ID', 'NAME' ));
 
-            if ($ar_section = $rs_sections->GetNext()) {
-                $section_ID = $ar_section['ID'];
+            if ($arSection = $rsSections->GetNext()) {
+                $sectionId = $arSection['ID'];
             } else {
                 // Создаем новый раздел
-                $section_code = $this->check_section_code(
+                $sectionCode = $this->checkSectionCode(
                     $this->core->getIblockId($this->core::IBLOCK_CODE_CATALOG_NEW),
-                    \Cutil::translit($section_name, "ru", ["replace_space"=>"_","replace_other"=>"_"])
+                    \Cutil::translit($sectionName, "ru", ["replace_space"=>"_","replace_other"=>"_"])
                 );
                 $arFields = array(
                         "ACTIVE" => 'Y',
-                        "IBLOCK_SECTION_ID" => $section_ID,
+                        "IBLOCK_SECTION_ID" => $sectionId,
                         "IBLOCK_ID" => $this->core->getIblockId($this->core::IBLOCK_CODE_CATALOG_NEW),
-                        "NAME" => $section_name,
-                        "CODE" => $section_code,
-                        "XML_ID" => $section_code,
+                        "NAME" => $sectionName,
+                        "CODE" => $sectionCode,
+                        "XML_ID" => $sectionCode,
                         "SORT" => '500',
                     );
-                $created_section_id = $obSection->Add($arFields);
+                $createdSectionId = $obSection->Add($arFields);
                 print_r("\n Создаем раздел: " . $arFields['NAME'] . "\n");
-                if (!$created_section_id) {
+                if (!$createdSectionId) {
                     $this->logger->addToLog('parser set catalog section', 'error', ['msg' => 'Ошибка создания раздела: ' . $obSection->LAST_ERROR, 'feed_id' => $this->feedId]);
                 } else {
-                    $section_ID = $created_section_id;
-                    print_r("\n Создали раздел: " . $created_section_id . "\n");
+                    $sectionId = $createdSectionId;
+                    print_r("\n Создали раздел: " . $createdSectionId . "\n");
                 }
             }
         }
 
-        return $section_ID;
+        return $sectionId;
     }
 
-    private function check_section_code($IBLOCK_ID, $CODE)
+    private function checkSectionCode($iblockId, $code)
     {
         $arCodes = array();
         $rsCodeLike = \CIBlockSection::GetList(array(), array(
-            "IBLOCK_ID" => $IBLOCK_ID,
-            "CODE" => $CODE."%",
+            "IBLOCK_ID" => $iblockId,
+            "CODE" => $code."%",
         ), false, false, array("ID", "CODE"));
         while ($ar = $rsCodeLike->Fetch()) {
             $arCodes[$ar["CODE"]] = $ar["ID"];
         }
 
-        if (array_key_exists($CODE, $arCodes)) {
+        if (array_key_exists($code, $arCodes)) {
             $i = 1;
-            while (array_key_exists($CODE."_".$i, $arCodes)) {
+            while (array_key_exists($code."_".$i, $arCodes)) {
                 $i++;
             }
-            return $CODE."_".$i;
+            return $code."_".$i;
         }
-        return $CODE;
+        return $code;
     }
     
     /**
      * Загрузить информацию о товаре
      *
-     * @param array $product_props_arr
+     * @param array $productPropsArr
      * Массив свойств товара
      */
-    private function import($product_props_arr)
+    private function import($productPropsArr)
     {
-        $result = FeedsImportTempTable::add($product_props_arr);
+        $result = FeedsImportTempTable::add($productPropsArr);
 
         if (!$result->isSuccess()) {
             $this->logger->addToLog('parse feed', 'error', ['msg' => 'Ошибка создания товара', 'errors' => $result->getErrorMessages()]);
-            $this->errors[$product_props_arr['ekn']][] = ['level' => 1, 'msg' => 'Ошибка создания товара : '. $result->getErrorMessages()];
+            $this->errors[$productPropsArr['ekn']][] = ['level' => 1, 'msg' => 'Ошибка создания товара : '. $result->getErrorMessages()];
         }
     }
 
     /**
      * Получить габариты и вес товара как свойства
      *
-     * @param array $dim_props
+     * @param array $dimProps
      * Массив габаритов и веса товара
      */
-    private function get_dims_to_show($dim_props)
+    private function getDimsToShow($dimProps)
     {
-        $dim_props_arr_to_show = [];
+        $dimPropsArrToShow = [];
         $translate = [
             'Length' => 'Длина',
             'Width' => 'Ширина',
             'Height' => 'Высота'
         ];
 
-        foreach ($dim_props as $name => $value) {
+        foreach ($dimProps as $name => $value) {
             switch ($name) {
                 case 'Weight':
 
                     if ($value >= 1000) {
                         $weight = $value * 0.001;
-                        $dim_props_arr_to_show['Вес, кг'] = round($weight, 2, PHP_ROUND_HALF_UP);
+                        $dimPropsArrToShow['Вес, кг'] = round($weight, 2, PHP_ROUND_HALF_UP);
                     }
 
-                    $dim_props_arr_to_show['Вес, г'] = ceil(floatval($value));
+                    $dimPropsArrToShow['Вес, г'] = ceil(floatval($value));
                     break;
                 
                 default:
@@ -1013,20 +1013,20 @@ class ExcelParse
 
                     //Если больше 10м -> добавляем метры и не меняем имя свойства
                     if ($value >= 10000) {
-                        $new_name = $translate[$name];
-                        $new_value = $value * 0.001;
-                        $dim_props_arr_to_show[$new_name] = strval($new_value) . ' m';
+                        $newName = $translate[$name];
+                        $newValue = $value * 0.001;
+                        $dimPropsArrToShow[$newName] = strval($newValue) . ' m';
 
                         break;
                     }
 
-                    $new_name = $translate[$name] . ', мм';
-                    $dim_props_arr_to_show[$new_name] = floatval($value);
+                    $newName = $translate[$name] . ', мм';
+                    $dimPropsArrToShow[$newName] = floatval($value);
                     break;
             }
         }
 
-        return $dim_props_arr_to_show;
+        return $dimPropsArrToShow;
     }
 
     public function getErrors()
